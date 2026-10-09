@@ -8,6 +8,17 @@ Intended to ship as the web UI (`links.ui`) for the community DAppNode package `
 > Community, unofficial. An original web implementation of the Logos node dashboard, built on the
 > Logos ecosystem's own open-source UI + design system.
 
+## Run on a CLI node (no build)
+Each release ships a self-contained tarball (built UI + a stdlib-Python server that proxies `/api` to
+the node). Needs only Python 3:
+
+```
+curl -L https://github.com/xAlisher/logos-node-webui/releases/latest/download/logos-node-webui.tar.gz | tar xz
+cd logos-node-webui && ./install-service.sh     # or ./run.sh in the foreground
+```
+
+Details, settings and the security note: [deploy/README.md](deploy/README.md).
+
 ## Plan
 See [docs/PLAN.md](docs/PLAN.md). Mapping specs are generated into [docs/spec/](docs/spec/):
 `ui-inventory.md` + `parity-checklist.json` (every feature/action), `design-system.md` (tokens +

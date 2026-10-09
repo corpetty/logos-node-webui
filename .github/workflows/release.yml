@@ -1,0 +1,36 @@
+name: release
+
+# Tag vX.Y.Z -> test, build, pack the CLI-node tarball, publish a GitHub Release with it.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run
+      - name: Package
+        run: scripts/package.sh "${GITHUB_REF_NAME#v}"
+      - name: Smoke test the tarball
+        run: |
+          mkdir -p /tmp/smoke && tar -xzf release/logos-node-webui.tar.gz -C /tmp/smoke
+          cd /tmp/smoke/logos-node-webui
+          (HOST=127.0.0.1 PORT=8099 ./run.sh &) ; sleep 2
+          curl -sf http://127.0.0.1:8099/ | grep -q '<div id="root">'
+          curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8099/wallet
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/*.tar.gz \
+            --title "$GITHUB_REF_NAME" --notes-file deploy/README.md --verify-tag

@@ -19,9 +19,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Reads give up after this long. While the node is Bootstrapping, some endpoints
+ * (pow/status, pow/rewards/claimable, blend/info) never answer; without a deadline the
+ * monitor's Promise.allSettled never settles and the dashboard stays on "Not started".
+ */
+export const READ_TIMEOUT_MS = 6000;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isRead = !init?.method || init.method === "GET";
   const res = await fetch(API_BASE + path, {
     headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+    ...(isRead && !init?.signal ? { signal: AbortSignal.timeout(READ_TIMEOUT_MS) } : {}),
     ...init,
   });
   if (!res.ok) {

@@ -125,8 +125,21 @@ export function useNodeMonitor(options: MonitorOptions = {}): DashboardModel {
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
+    // Reads can take up to READ_TIMEOUT_MS (some endpoints hang while Bootstrapping);
+    // skip a tick rather than stack polls on the node.
+    let inFlight = false;
 
     async function poll() {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        await pollOnce();
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    async function pollOnce() {
       const [info, time, net, blend, pow, claimable, aged, vouchers] = await Promise.allSettled([
         getCryptarchiaInfo(),
         getTimeInfo(),

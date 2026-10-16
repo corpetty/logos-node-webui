@@ -13,7 +13,7 @@ Each release ships a self-contained tarball (built UI + a stdlib-Python server t
 the node). Needs only Python 3:
 
 ```
-curl -L https://github.com/xAlisher/logos-node-webui/releases/latest/download/logos-node-webui.tar.gz | tar xz
+curl -L https://github.com/corpetty/logos-node-webui/releases/latest/download/logos-node-webui.tar.gz | tar xz
 cd logos-node-webui && ./install-service.sh     # or ./run.sh in the foreground
 ```
 

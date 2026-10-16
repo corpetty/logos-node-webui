@@ -7,7 +7,7 @@ Node.js, no build, no Docker.
 ## Install
 
 ```
-curl -L https://github.com/xAlisher/logos-node-webui/releases/latest/download/logos-node-webui.tar.gz | tar xz
+curl -L https://github.com/corpetty/logos-node-webui/releases/latest/download/logos-node-webui.tar.gz | tar xz
 cd logos-node-webui
 ./run.sh                 # foreground; Ctrl+C to stop
 ```

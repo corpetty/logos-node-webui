@@ -148,6 +148,13 @@ def main():
     ap.add_argument("--allow", default="private",
                     help="who may connect: 'private' (default), 'any', or comma-separated CIDRs")
     a = ap.parse_args()
+    # A missing/unreadable dist otherwise shows up only as a bare 404 in the browser.
+    index = os.path.join(os.path.abspath(a.dist), "index.html")
+    try:
+        open(index, "rb").close()
+    except OSError as e:
+        sys.exit(f"cannot read {index} as uid {os.getuid()}: {e.strerror}. "
+                 "Check --dist (systemd does not expand ~) and that the user running this can read dist/.")
     if ":" in a.host:
         Server.address_family = socket.AF_INET6
     Server.allow = parse_allow(a.allow)

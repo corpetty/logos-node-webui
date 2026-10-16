@@ -5,16 +5,67 @@ Same shape as the DAppNode package's nginx: /api/<path> -> <node>/<path>, everyt
 else is a static file with SPA fallback to index.html. Stdlib only, so it runs on any
 CLI node box without Docker or nginx. Streams responses (SSE endpoints stay live).
 
-  python3 serve.py --dist ./dist --node http://127.0.0.1:8080 --host 100.x.y.z --port 8095
+  python3 serve.py --dist ./dist --node http://127.0.0.1:8080 --port 8090
+
+Binds every interface by default (--host 0.0.0.0) so the UI is reachable on the LAN and the
+Tailscale address at once, including when Tailscale comes up after this process. The UI has
+mining and wallet controls and no login, so by default only clients on private networks are
+served (--allow private): loopback, RFC1918 LAN, link-local, Tailscale (100.64.0.0/10 and its
+IPv6 range). Anything else, e.g. a port-forwarded public address, is dropped.
 """
 import argparse
 import http.client
+import ipaddress
 import os
+import socket
+import sys
 import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+PRIVATE = [ipaddress.ip_network(n) for n in (
+    "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
+    "100.64.0.0/10",                 # Tailscale (CGNAT) IPv4
+    "::1/128", "fc00::/7", "fe80::/10",  # loopback, ULA (incl. Tailscale fd7a:115c:a1e0::/48), link-local
+)]
+
 HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
        "te", "trailers", "transfer-encoding", "upgrade", "host"}
+
+
+def parse_allow(spec):
+    """'private' -> PRIVATE, 'any' -> None (no filtering), else comma-separated CIDRs/addresses."""
+    spec = spec.strip().lower()
+    if spec == "any":
+        return None
+    nets = []
+    for part in spec.split(","):
+        part = part.strip()
+        if part == "private":
+            nets += PRIVATE
+        elif part:
+            nets.append(ipaddress.ip_network(part, strict=False))
+    return nets
+
+
+def allowed(addr, nets):
+    if nets is None:
+        return True
+    ip = ipaddress.ip_address(addr.split("%")[0])
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return any(ip in n for n in nets if n.version == ip.version)
+
+
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    allow = None
+    address_family = socket.AF_INET
+
+    def verify_request(self, request, client_address):
+        if allowed(client_address[0], self.allow):
+            return True
+        print(f"refused {client_address[0]} (not in --allow)", file=sys.stderr, flush=True)
+        return False
 
 
 def make_handler(dist, node):
@@ -91,12 +142,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dist", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist"))
     ap.add_argument("--node", default="http://127.0.0.1:8080")
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=8095)
+    ap.add_argument("--host", default="0.0.0.0",
+                    help="bind address; 0.0.0.0 = all interfaces (LAN + Tailscale), '::' for IPv6 too")
+    ap.add_argument("--port", type=int, default=8090)
+    ap.add_argument("--allow", default="private",
+                    help="who may connect: 'private' (default), 'any', or comma-separated CIDRs")
     a = ap.parse_args()
-    srv = ThreadingHTTPServer((a.host, a.port), make_handler(os.path.abspath(a.dist), a.node))
-    srv.daemon_threads = True
-    print(f"web UI on http://{a.host}:{a.port} -> node {a.node}", flush=True)
+    if ":" in a.host:
+        Server.address_family = socket.AF_INET6
+    Server.allow = parse_allow(a.allow)
+    srv = Server((a.host, a.port), make_handler(os.path.abspath(a.dist), a.node))
+    print(f"web UI on http://{a.host}:{a.port} -> node {a.node} (allow: {a.allow})", flush=True)
     srv.serve_forever()
 
 

@@ -18,22 +18,26 @@ Or keep it running across reboots as a systemd user service:
 ./install-service.sh     # creates logos-webui.service and starts it
 ```
 
-Open `http://<tailscale-ip>:8090`.
+Open `http://<lan-ip>:8090` or `http://<tailscale-ip>:8090`; both work at once. The scripts print the URLs.
 
 ## Settings (env vars, for both scripts)
 
 | Var | Default | |
 |---|---|---|
 | `NODE_API` | `http://127.0.0.1:8080` | the node's HTTP API (`api.backend.listen_address` in `user_config.yaml`) |
-| `HOST` | this box's Tailscale IPv4, else `127.0.0.1` | bind address |
+| `HOST` | `0.0.0.0` | bind address; all interfaces, so LAN and Tailscale both work, even if Tailscale starts after the service |
 | `PORT` | `8090` | |
+| `ALLOW` | `private` | who may connect: `private` (loopback, LAN, Tailscale), `any`, or comma-separated CIDRs |
 
 Example: `env PORT=8095 NODE_API=http://127.0.0.1:18080 ./run.sh`
 
 ## Security
 
-The UI can start and stop mining and send funds, and it has **no login**. It binds to Tailscale or
-localhost by default. Set `HOST=0.0.0.0` only on a network you trust.
+The UI can start and stop mining and send funds, and it has **no login**. It listens on all
+interfaces but only serves clients on private networks (loopback, RFC1918 LAN, link-local, Tailscale
+`100.64.0.0/10`); connections from any other address are dropped, so a router port-forward does not
+expose it. Narrow it further with e.g. `ALLOW=192.168.1.0/24,100.64.0.0/10`. `ALLOW=any` disables the
+check: use it only on a network you trust.
 
 ## What it does
 
